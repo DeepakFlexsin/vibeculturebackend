@@ -179,6 +179,20 @@ const escapeHtml = (str = '') => String(str)
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
 
+const SITE = 'https://www.vibeculture.in'
+
+/** Prefer gallery image; force Cloudinary JPG size WhatsApp can fetch. */
+const toOgImage = (product) => {
+    const raw = product?.image?.[0] || product?.seo?.ogImage || `${SITE}/logo.png`
+    let src = String(raw).trim()
+    if (src.startsWith('//')) src = `https:${src}`
+    if (src.startsWith('http://')) src = src.replace('http://', 'https://')
+    if (src.includes('res.cloudinary.com') && src.includes('/upload/') && !/\/upload\/[^/]*f_/.test(src)) {
+        src = src.replace('/upload/', '/upload/f_jpg,w_1200,h_1200,c_fill,q_auto:good/')
+    }
+    return src
+}
+
 const findProductByIdOrSlug = async (idOrSlug) => {
     if (!idOrSlug) return null
     if (/^[0-9a-fA-F]{24}$/.test(idOrSlug)) {
@@ -198,13 +212,12 @@ const getProductOg = async (req, res) => {
             return res.status(404).send('Product not found')
         }
 
-        const site = 'https://www.vibeculture.in'
         const slug = product.seo?.slug || String(product._id)
-        const url = `${site}/product/${slug}`
+        const url = `${SITE}/product/${slug}`
         const title = escapeHtml(product.seo?.metaTitle || product.name)
         const plainDesc = String(product.description || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
         const description = escapeHtml(product.seo?.metaDescription || plainDesc.slice(0, 160) || `Buy ${product.name} at VibeCulture`)
-        const image = escapeHtml(product.seo?.ogImage || product.image?.[0] || `${site}/logo.png`)
+        const image = escapeHtml(toOgImage(product))
         const price = product.price
         const inStock = Array.isArray(product.variants) && product.variants.length
             ? product.variants.some(v => v.quantity > 0)
@@ -213,20 +226,22 @@ const getProductOg = async (req, res) => {
         const name = escapeHtml(product.name)
 
         const html = `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" prefix="og: https://ogp.me/ns#">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${title} | VibeCulture</title>
   <meta name="description" content="${description}" />
   <link rel="canonical" href="${url}" />
-  <meta property="og:type" content="product" />
+  <meta property="og:type" content="website" />
   <meta property="og:site_name" content="VibeCulture" />
+  <meta property="og:locale" content="en_IN" />
   <meta property="og:url" content="${url}" />
   <meta property="og:title" content="${title}" />
   <meta property="og:description" content="${description}" />
   <meta property="og:image" content="${image}" />
   <meta property="og:image:secure_url" content="${image}" />
+  <meta property="og:image:type" content="image/jpeg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="1200" />
   <meta property="og:image:alt" content="${name}" />
@@ -242,7 +257,7 @@ const getProductOg = async (req, res) => {
 </head>
 <body>
   <main style="font-family:system-ui,sans-serif;max-width:480px;margin:40px auto;padding:0 16px">
-    <img src="${image}" alt="${name}" style="width:100%;border-radius:12px;aspect-ratio:1;object-fit:cover" />
+    <img src="${image}" alt="${name}" width="1200" height="1200" style="width:100%;border-radius:12px;aspect-ratio:1;object-fit:cover" />
     <h1 style="font-size:1.4rem;margin:16px 0 8px">${name}</h1>
     <p style="color:#555;margin:0 0 8px">${description}</p>
     <p style="font-size:1.25rem;font-weight:700;margin:0 0 16px">₹${price}</p>
